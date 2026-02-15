@@ -1,18 +1,19 @@
 package config
 
-import "fmt"
-
-// Config is a placeholder for future configuration.
-type Config struct{}
-
-// ConfigLoader loads and parses configuration from a given path.
-type ConfigLoader interface {
-	Load(path string) (Config, error)
+// Config holds all application configuration parsed from YAML.
+type Config struct {
+	Sources SourcesConfig `yaml:"sources"`
 }
 
-// StubConfigLoader is a stub that always returns not implemented.
-type StubConfigLoader struct{}
+// SourcesConfig holds per-source configuration blocks.
+// A nil pointer means the source was not mentioned in the config file;
+// it does NOT mean the source is disabled.
+type SourcesConfig struct {
+	AWS *AWSConfig `yaml:"aws,omitempty"`
+	// Future: GitHub *GitHubConfig `yaml:"github,omitempty"`
+}
 
-func (s *StubConfigLoader) Load(_ string) (Config, error) {
-	return Config{}, fmt.Errorf("not implemented")
+// AWSConfig holds AWS-specific settings declared in the config file.
+type AWSConfig struct {
+	Region string `yaml:"region,omitempty"`
 }
