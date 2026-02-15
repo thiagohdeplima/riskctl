@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/inspector2"
 	"github.com/aws/aws-sdk-go-v2/service/inspector2/types"
 
@@ -28,17 +28,15 @@ type inspectorAPI interface {
 }
 
 // AWSInspectorSource retrieves vulnerability findings from AWS Inspector.
-// Regions are set at construction time; AWS credentials come from the
-// default SDK credential chain (environment, profile, IMDS, etc.).
+// AWS credentials come from the default SDK credential chain (environment,
+// profile, IMDS, etc.). The region is read from Config at call time.
 type AWSInspectorSource struct {
-	regions   []string
 	newClient func(ctx context.Context, region string) (inspectorAPI, error)
 }
 
-// NewAWSInspectorSource creates a source that scans the given AWS regions.
-func NewAWSInspectorSource(regions []string) *AWSInspectorSource {
+// NewAWSInspectorSource creates a new AWS Inspector finding source.
+func NewAWSInspectorSource() *AWSInspectorSource {
 	return &AWSInspectorSource{
-		regions:   regions,
 		newClient: defaultInspectorClient,
 	}
 }
@@ -53,38 +51,22 @@ func defaultInspectorClient(ctx context.Context, region string) (inspectorAPI, e
 	return inspector2.NewFromConfig(cfg), nil
 }
 
-// ListFindings iterates configured AWS regions and aggregates all active findings.
-// The cfg and query parameters are accepted to satisfy the FindingSource interface
-// but are not used — regions and credentials come from the environment.
-func (s *AWSInspectorSource) ListFindings(ctx context.Context, _ appcfg.Config, _ findings.Query) ([]findings.Finding, error) {
-	var out []findings.Finding
-
-	if len(s.regions) == 0 {
-		return nil, fmt.Errorf("aws inspector: no regions configured")
+// ListFindings fetches all active findings from the region specified in cfg.
+func (s *AWSInspectorSource) ListFindings(ctx context.Context, cfg appcfg.Config, _ findings.Query) ([]findings.Finding, error) {
+	if cfg.Sources.AWS == nil || cfg.Sources.AWS.Region == "" {
+		return nil, fmt.Errorf("aws inspector: region not configured")
 	}
 
-	for _, region := range s.regions {
-		regional, err := s.listFindingsForRegion(ctx, region)
-		if err != nil {
-			return nil, fmt.Errorf("region %s: %w", region, err)
-		}
-		out = append(out, regional...)
-	}
+	region := cfg.Sources.AWS.Region
 
-	return out, nil
-}
-
-// listFindingsForRegion creates a client for a single region, fetches all
-// active findings via pagination, and converts them to the canonical model.
-func (s *AWSInspectorSource) listFindingsForRegion(ctx context.Context, region string) ([]findings.Finding, error) {
 	client, err := s.newClient(ctx, region)
 	if err != nil {
-		return nil, fmt.Errorf("client init: %w", err)
+		return nil, fmt.Errorf("region %s: client init: %w", region, err)
 	}
 
 	awsFindings, err := fetchActiveFindings(ctx, client)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("region %s: %w", region, err)
 	}
 
 	out := make([]findings.Finding, 0, len(awsFindings))
