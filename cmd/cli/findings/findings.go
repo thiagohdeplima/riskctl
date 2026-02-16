@@ -9,6 +9,7 @@ import (
 	"github.com/thiagohdeplima/riskctl/internal/config"
 	findingspkg "github.com/thiagohdeplima/riskctl/internal/findings"
 	"github.com/thiagohdeplima/riskctl/internal/findings/sources"
+	"github.com/thiagohdeplima/riskctl/internal/renderer"
 )
 
 var FindingCmd = &cobra.Command{
@@ -27,7 +28,9 @@ func init() {
 }
 
 func ExecFindingListCmd(cmd *cobra.Command, args []string) {
-	loader := config.ConfigLoader{}
+	var render = renderer.JSONRenderer{}
+	var loader = config.ConfigLoader{}
+
 	cfg, err := loader.Load()
 	if err != nil {
 		fmt.Println(err)
@@ -35,20 +38,14 @@ func ExecFindingListCmd(cmd *cobra.Command, args []string) {
 	}
 
 	src := sources.NewAWSInspectorSource()
-	results, err := src.ListFindings(cmd.Context(), cfg, findingspkg.Query{})
+	findings, err := src.ListFindings(cmd.Context(), cfg, findingspkg.Query{})
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Found %d findings\n\n", len(results))
-	for _, f := range results {
-		fmt.Printf("%-14s %s\n", "FindingID:", f.FindingID)
-		fmt.Printf("%-14s %s\n", "Severity:", f.Severity)
-		fmt.Printf("%-14s %s\n", "VulnID:", f.VulnID)
-		fmt.Printf("%-14s %s\n", "AssetType:", f.AssetType)
-		fmt.Printf("%-14s %s\n", "AssetID:", f.AssetID)
-		fmt.Printf("%-14s %v\n", "FixAvailable:", f.FixAvailable)
-		fmt.Println("---")
+	if err := render.Render(cmd.Context(), findings, os.Stdout); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }

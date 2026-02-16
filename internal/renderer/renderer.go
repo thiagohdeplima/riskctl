@@ -10,12 +10,12 @@ import (
 
 // Renderer outputs findings in a specified format.
 type Renderer interface {
-	Render(ctx context.Context, findings []findings.Finding, format string, output io.Writer) error
+	Render(ctx context.Context, findings []findings.Finding, output io.Writer) error
 }
 
 // StubRenderer is a stub that always returns not implemented.
 type StubRenderer struct{}
 
-func (s *StubRenderer) Render(_ context.Context, _ []findings.Finding, _ string, _ io.Writer) error {
+func (s *StubRenderer) Render(_ context.Context, _ []findings.Finding, _ io.Writer) error {
 	return fmt.Errorf("not implemented")
 }
